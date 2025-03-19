@@ -25,7 +25,7 @@ def connect_snowflake():
         log_info("Successfully connected to Snowflake")
         return conn
     except Exception as e:
-        log_error(f"❌ Snowflake Connection Failed: {e}")
+        log_error(f" Snowflake Connection Failed: {e}")
         return None
 
 def table_exists(table_name):
@@ -47,7 +47,7 @@ def create_table_if_not_exists(json_data):
     """Creates table dynamically based on JSON structure, excluding CDC metadata columns."""
     table_name = json_data[0].get("_source_table")
     if not table_name:
-        log_error("❌ '_source_table' key is missing in JSON data")
+        log_error("'_source_table' key is missing in JSON data")
         return
 
     table_name = table_name.replace(".", "_")  # Convert to Snowflake-compatible format
@@ -78,7 +78,7 @@ def create_table_if_not_exists(json_data):
     cursor = conn.cursor()
     try:
         cursor.execute(create_table_query)
-        log_info(f"✅ Table '{table_name}' created successfully")
+        log_info(f" Table '{table_name}' created successfully")
     finally:
         cursor.close()
         conn.close()
@@ -107,7 +107,7 @@ def add_missing_columns(record):
     """Add any missing columns based on the JSON data, excluding CDC metadata columns."""
     table_name = record.get("_source_table")
     if not table_name:
-        log_error("❌ '_source_table' key is missing in record")
+        log_error(" '_source_table' key is missing in record")
         return
 
     table_name = table_name.replace(".", "_")  # Convert to Snowflake-compatible format
@@ -119,7 +119,7 @@ def add_missing_columns(record):
 
     for column, value in record.items():
         if column.lower() in existing_columns or column in EXCLUDED_COLUMNS or column == "_source_table":
-            log_info(f"⚠️ Column '{column}' already exists or is excluded. Skipping addition.")
+            log_info(f"⚠ Column '{column}' already exists or is excluded. Skipping addition.")
             continue
         if isinstance(value, int):
             col_type = "INT"
@@ -133,10 +133,10 @@ def add_missing_columns(record):
         alter_query = f'ALTER TABLE {SNOWFLAKE_CONFIG["schema"]}.{table_name} ADD COLUMN "{column}" {col_type}'
         try:
             cursor.execute(alter_query)
-            log_info(f"✅ Added new column: {column}")
+            log_info(f" Added new column: {column}")
             existing_columns.add(column.lower())  # Add the new column to the set to avoid duplicate attempts
         except Exception as e:
-            log_error(f"❌ Error adding column '{column}': {e}")
+            log_error(f" Error adding column '{column}': {e}")
 
     cursor.close()
     conn.close()
@@ -150,13 +150,13 @@ def record_exists_in_snowflake(record, cursor):
     unique_columns = [col for col in record.keys() if col.lower() not in EXCLUDED_COLUMNS and col != "_source_table"]
     
     if not unique_columns:
-        log_error("⚠️ No unique columns found in record for deduplication. Skipping record.")
+        log_error("⚠ No unique columns found in record for deduplication. Skipping record.")
         return False
 
     # Safely quote the table and column names
     table_name = record.get("_source_table")
     if not table_name:
-        log_error("❌ '_source_table' key is missing in record")
+        log_error(" '_source_table' key is missing in record")
         return False
 
     table_name = f"{SNOWFLAKE_CONFIG['database']}.{SNOWFLAKE_CONFIG['schema']}.{table_name.replace('.', '_')}"
@@ -172,7 +172,7 @@ def record_exists_in_snowflake(record, cursor):
         exists = cursor.fetchone()[0] > 0
         return exists
     except Exception as e:
-        log_error(f"❌ Error checking record existence: {e}")
+        log_error(f" Error checking record existence: {e}")
         return False
 
 def download_and_process_blob():
@@ -187,10 +187,10 @@ def download_and_process_blob():
         
         download_stream = blob_client.download_blob()
         json_data = json.loads(download_stream.readall())
-        log_info(f"📥 Downloaded CDC JSON from Azure Blob Storage: {len(json_data)} records")
+        log_info(f" Downloaded CDC JSON from Azure Blob Storage: {len(json_data)} records")
 
         if not json_data:
-            log_info("⚠️ No records to process")
+            log_info("⚠ No records to process")
             return
 
         # Group records by '_source_table'
@@ -198,7 +198,7 @@ def download_and_process_blob():
         for record in json_data:
             table_name = record.get("_source_table")
             if not table_name:
-                log_error("❌ '_source_table' key is missing in record")
+                log_error(" '_source_table' key is missing in record")
                 continue
             table_name = table_name.replace(".", "_")
             records_by_table.setdefault(table_name, []).append(record)
@@ -229,7 +229,7 @@ def download_and_process_blob():
                     
                     # Check for duplicates within the batch
                     if record_key in unique_records:
-                        log_info(f"⚠️ Duplicate record found in batch for table: {table_name}. Skipping.")
+                        log_info(f"⚠ Duplicate record found in batch for table: {table_name}. Skipping.")
                         continue
                     
                     # Check for duplicates in Snowflake
@@ -237,10 +237,10 @@ def download_and_process_blob():
                         filtered_data.append(filtered_record)
                         unique_records.add(record_key)
                     else:
-                        log_info(f"⚠️ Record already exists in Snowflake for table: {table_name}. Skipping.")
+                        log_info(f"⚠ Record already exists in Snowflake for table: {table_name}. Skipping.")
 
                 if not filtered_data:
-                    log_info(f"⚠️ No new records to insert for table: {table_name}")
+                    log_info(f"⚠ No new records to insert for table: {table_name}")
                     continue
 
                 # Log details about filtered records
@@ -256,21 +256,21 @@ def download_and_process_blob():
 
                 cursor.executemany(insert_query, [tuple(record.values()) for record in filtered_data])
                 conn.commit()
-                log_info(f"✅ {len(filtered_data)} new records inserted into table: {table_name}")
+                log_info(f" {len(filtered_data)} new records inserted into table: {table_name}")
 
             finally:
                 cursor.close()
                 conn.close()
 
     except Exception as e:
-        log_error(f"❌ Error processing CDC data: {e}")
+        log_error(f" Error processing CDC data: {e}")
 
 def main():
     """Main function to run the CDC pipeline."""
     try:
         download_and_process_blob()
     except Exception as e:
-        log_error(f"❌ Error in main(): {str(e)}")
+        log_error(f" Error in main(): {str(e)}")
 
 if __name__ == "__main__":
     main()
