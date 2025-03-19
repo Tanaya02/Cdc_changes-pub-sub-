@@ -146,7 +146,7 @@ def upload_to_blob(data):
         with open(file_path, "rb") as f:
             blob_client.upload_blob(f, overwrite=True)
 
-        log_info("✅ CDC Changes uploaded to Azure Blob successfully")
+        log_info(" CDC Changes uploaded to Azure Blob successfully")
 
         downloaded_content = blob_client.download_blob().readall()
         log_info(f"Verified blob size: {len(downloaded_content)} bytes")
